@@ -1,0 +1,107 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+
+    match /admins/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['displayName', 'email', 'createdAt', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 100
+        && request.resource.data.email == request.auth.token.email;
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'email', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 100
+        && request.resource.data.email == request.auth.token.email;
+      allow delete: if false;
+    }
+
+    match /offers/{offerId} {
+      // Public visitors may fetch one offer or list at most 100 offers per query.
+      // Admin dashboard queries may use their separate higher limit.
+      allow get: if true;
+      allow list: if isAdmin() || request.query.limit <= 100;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Holds and payment locks are server-only; never expose another visitor's UID.
+    match /offerLocks/{offerId} { allow read, write: if false; }
+
+    match /bookings/{bookingId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if false;
+      allow update, delete: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /supportTickets/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['ticketNo','userId','userEmail','type','invoice','description','status','createdAt'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'open'
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 3000
+        && request.resource.data.type is string && request.resource.data.type.size() <= 40
+        && request.resource.data.invoice is string && request.resource.data.invoice.size() <= 100;
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /chats/{uid} {
+      allow read, write: if isOwner(uid) || isAdmin();
+      match /messages/{mid} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create: if (isOwner(uid) && request.resource.data.keys().hasOnly(['from','text','createdAt'])
+          && request.resource.data.from == 'user' && request.resource.data.text is string
+          && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000) || isAdmin();
+        allow update, delete: if false;
+      }
+    }
+
+    match /radarPrefs/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if isOwner(uid) && request.resource.data.userId == uid;
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    match /sosRequests/{id} {
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'open';
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /consents/{id} {
+      allow create: if signedIn() && request.resource.data.keys().hasOnly(['userId','agreed','purpose','createdAt'])
+        && request.resource.data.agreed == true && request.resource.data.userId == request.auth.uid
+        && request.resource.data.purpose is string && request.resource.data.purpose.size() <= 80;
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update, delete: if false;
+    }
+
+    // Immutable server-side administrative audit trail.
+    match /auditLogs/{id} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /apiRateLimits/{id} { allow read, write: if false; }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#071426">
+<title>حالة الدفع | Travel Touch</title><script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<style>body{background:#071426;color:#e5eefb;font-family:system-ui,sans-serif}.panel{background:#10243b;border:1px solid #25415f;border-radius:22px}.muted{color:#9bb0c8}</style>
+<link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/tt-design.css">
+</head>
+<body class="min-h-screen grid place-items-center p-4">
+<main class="panel w-full max-w-xl p-7 text-center">
+<div class="text-5xl mb-4">✈️</div><h1 class="text-2xl font-black">شكراً لاختيارك Travel Touch</h1>
+<p id="status" class="muted mt-4">نتحقق من حالة الدفع ونستكمل تأكيد عملية PayPal الآمنة…</p>
+<div id="details" class="mt-5 text-sm"></div>
+<div class="flex flex-wrap justify-center gap-3 mt-7"><button id="check" class="bg-sky-600 rounded-xl px-5 py-3 font-bold">تحديث حالة الدفع</button><a href="ticketWallet.html" class="border border-slate-600 rounded-xl px-5 py-3">محفظة التذاكر</a></div>
+<a href="index.html" class="inline-block text-sky-300 mt-6">العودة للرئيسية</a>
+</main>
+<script type="module">
+import { TT } from "./tt-backend.js";
+const $ = id => document.getElementById(id);
+const orderId = new URLSearchParams(location.search).get("token");
+let checking = false;
+async function check() {
+  if (checking) return; checking = true; $("check").disabled = true;
+  try {
+    const { user } = await TT.whenReady();
+    if (!user) { TT.requireLogin(); return; }
+    if (!orderId) throw new Error("لم يصل معرّف طلب PayPal. افتح محفظة التذاكر للتحقق من حجوزاتك.");
+    const result = await TT.capturePayPalOrder(orderId);
+    if (result.status === "paid" && result.bookingId) {
+      $("status").innerHTML = '<span class="text-emerald-300 font-bold">تم تأكيد الدفع والحجز بنجاح.</span>';
+      $("details").innerHTML = `رقم الحجز: <b dir="ltr">${TT.esc(result.bookingId)}</b>`;
+      $("details").innerHTML += `<p class="mt-4"><a class="text-sky-300 underline" href="ticketWallet.html?booking=${encodeURIComponent(result.bookingId)}">عرض التذكرة الآن</a></p>`;
+    } else if (result.status === "refunded") {
+      $("status").innerHTML = '<span class="text-amber-300">تعذر تثبيت العرض، وتم رد المبلغ عبر PayPal.</span>';
+    } else if (result.status === "refund_required" || result.status === "review_required") {
+      $("status").innerHTML = '<span class="text-amber-300">وصل إشعار الدفع، لكن الحجز يحتاج مراجعة يدوية. لا تعاود الدفع؛ تواصل مع الدعم مع الاحتفاظ برقم العملية.</span>';
+    } else if (["failed", "expired", "creation_failed"].includes(result.status)) {
+      $("status").innerHTML = '<span class="text-amber-300">لم تكتمل عملية الدفع. يمكنك العودة واختيار عرض آخر.</span>';
+    } else {
+      $("status").textContent = "عملية PayPal قيد المعالجة. لم نؤكد الحجز بعد؛ أعد المحاولة بعد قليل.";
+      $("details").textContent = `الحالة الحالية: ${result.status || result.paymentStatus || "قيد المعالجة"}`;
+    }
+  } catch (e) { $("status").textContent = e.message || "تعذر التحقق الآن. حاول مرة أخرى."; }
+  finally { checking = false; $("check").disabled = false; }
+}
+$("check").addEventListener("click", check);
+check();
+</script>
+<script>if("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("/sw.js").catch(()=>{});</script></body></html>

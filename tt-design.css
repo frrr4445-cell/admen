@@ -1,0 +1,53 @@
+
+/* Travel Touch responsive layer — additive styles for existing application pages */
+:root{color-scheme:dark;--tt-focus:#55c9e9}
+html{scroll-behavior:smooth;text-size-adjust:100%;-webkit-text-size-adjust:100%}
+body.tt-app-page{overflow-x:hidden}
+.tt-app-page img,.tt-app-page video,.tt-app-page canvas{max-width:100%;height:auto}
+.tt-app-page :focus-visible{outline:3px solid var(--tt-focus);outline-offset:3px}
+.tt-app-page button,.tt-app-page a,.tt-app-page input,.tt-app-page select,.tt-app-page textarea{touch-action:manipulation}
+.tt-app-page button,.tt-app-page a{ -webkit-tap-highlight-color:transparent}
+.tt-app-page input,.tt-app-page select,.tt-app-page textarea{max-width:100%;min-width:0}
+.tt-app-page table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse}
+.tt-app-page pre,.tt-app-page code{overflow-wrap:anywhere}
+.tt-app-page .glass,.tt-app-page .glass-strong{max-width:100%}
+@media(max-width:640px){
+ .tt-app-page{font-size:15px}
+ .tt-app-page main{max-width:100%;width:100%}
+ .tt-app-page .checkout-container{width:100%;max-width:100%}
+ .tt-app-page .urgency-bar{gap:.55rem;padding:.7rem .85rem}
+ .tt-app-page .urgency-bar .timer .digits{font-size:1.35rem;min-width:3.6rem}
+ .tt-app-page input,.tt-app-page select,.tt-app-page textarea{font-size:16px}
+ .tt-app-page button{min-height:42px}
+}
+@media(prefers-reduced-motion:reduce){
+ html{scroll-behavior:auto}
+ *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+
+/* Accessible global notification layer */
+.tt-toast-region{position:fixed;z-index:10000;inset-block-start:1rem;inset-inline-end:1rem;display:grid;gap:.65rem;width:min( min(92vw,24rem), calc(100vw - 2rem));pointer-events:none}
+.tt-toast{padding:.9rem 1rem;border:1px solid #35516f;border-radius:14px;background:#10243b;color:#eef6ff;box-shadow:0 12px 36px #0005;font:600 .92rem/1.5 system-ui,sans-serif;opacity:0;transform:translateY(-8px);transition:opacity .2s ease,transform .2s ease;overflow-wrap:anywhere}
+.tt-toast.is-visible{opacity:1;transform:translateY(0)}
+.tt-toast-success{border-color:#16865b}.tt-toast-error{border-color:#c34e59}.tt-toast-warning{border-color:#b88732}.tt-toast-info{border-color:#2875a9}
+@media(prefers-reduced-motion:reduce){.tt-toast{transition:none;transform:none}}
+
+/* 1.5 performance and motion layer — progressive enhancement only */
+:root{--tt-glass:rgba(13,37,54,.72);--tt-glass-border:rgba(202,225,237,.16)}
+.tt-glass{background:var(--tt-glass);border:1px solid var(--tt-glass-border);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 18px 55px #0003}
+.tt-skeleton{position:relative;overflow:hidden;background:linear-gradient(90deg,#ffffff0a 25%,#ffffff18 37%,#ffffff0a 63%);background-size:400% 100%;animation:tt-shimmer 1.35s ease infinite;border-radius:12px;min-height:1rem}
+@keyframes tt-shimmer{0%{background-position:100% 0}100%{background-position:0 0}}
+::view-transition-old(root){animation:tt-fade-out .14s ease both}::view-transition-new(root){animation:tt-fade-in .2s ease both}
+@keyframes tt-fade-out{to{opacity:.72;filter:blur(2px)}}@keyframes tt-fade-in{from{opacity:.65;filter:blur(2px)}to{opacity:1;filter:blur(0)}}
+.tt-pressable{transition:transform .16s ease,filter .16s ease}.tt-pressable:active{transform:scale(.985)}
+@media(prefers-reduced-motion:reduce){.tt-skeleton{animation:none}::view-transition-old(root),::view-transition-new(root){animation:none}.tt-pressable{transition:none}}
+@view-transition{navigation:auto}
+
+/* Non-blocking accessible confirmation/input dialogs */
+.tt-dialog-backdrop{position:fixed;inset:0;z-index:10001;display:grid;place-items:center;padding:1rem;background:rgba(2,10,22,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:tt-dialog-in .14s ease both}
+.tt-dialog{width:min(100%,28rem);padding:1.35rem;border:1px solid rgba(148,190,220,.24);border-radius:20px;background:linear-gradient(145deg,#142d46,#091a2c);color:#eef6ff;box-shadow:0 24px 80px #0009}
+.tt-dialog-title{margin:0 0 .55rem;font-size:1.12rem;font-weight:800}.tt-dialog-message{margin:0;color:#c0d1e1;line-height:1.7;white-space:pre-wrap}
+.tt-dialog-input{box-sizing:border-box;width:100%;margin-top:1rem;padding:.8rem .9rem;border:1px solid #41617f;border-radius:11px;background:#07182a;color:#fff;font:inherit;outline-offset:3px}
+.tt-dialog-actions{display:flex;gap:.65rem;justify-content:flex-end;margin-top:1.2rem}.tt-dialog-actions button{min-height:42px;padding:.65rem 1rem;border-radius:11px;font:700 .9rem system-ui;cursor:pointer}
+.tt-dialog-cancel{border:1px solid #48617a;background:#203a54;color:#e6f1fb}.tt-dialog-accept{border:1px solid #1686b8;background:#087eae;color:white}.tt-dialog-accept.is-danger{border-color:#b94454;background:#a92e40}
+@keyframes tt-dialog-in{from{opacity:0}to{opacity:1}}@media(prefers-reduced-motion:reduce){.tt-dialog-backdrop{animation:none}}

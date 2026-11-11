@@ -1,0 +1,22 @@
+{
+  "name": "travel-touch-vercel",
+  "version": "1.6.0",
+  "private": true,
+  "engines": {
+    "node": "24.x"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.2"
+  },
+  "scripts": {
+    "migrate:offer-locks": "node scripts/migrate-offer-locks.js",
+    "test": "node scripts/validate-project.js && node --test tests/*.test.mjs",
+    "configure:ttl": "bash scripts/configure-firestore-ttl.sh",
+    "test:unit": "node --test tests/*.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:performance": "node --test tests/performance.test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

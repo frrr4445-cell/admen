@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#071426"><title>إدارة Travel Touch</title>
+<link rel="stylesheet" href="/assets/tt-design.css">
+<link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:dark}body{margin:0;background:#071426;color:#e7f0fb;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1200px;margin:auto;padding:24px}.panel{background:#10243b;border:1px solid #25415f;border-radius:18px;padding:20px;margin:18px 0}
+h1,h2{margin:0 0 14px}.muted{color:#9bb0c8}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+input,select{width:100%;box-sizing:border-box;background:#091b2e;color:#e7f0fb;border:1px solid #31516f;border-radius:10px;padding:11px;margin-top:5px}
+label{font-size:13px;color:#b8c9dc}.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:#0284c7;color:white}.btn.secondary{background:#29435e}.btn.danger{background:#b42332}.btn:disabled{opacity:.5;cursor:wait}
+.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:680px}th,td{text-align:right;padding:12px;border-bottom:1px solid #25415f;font-size:14px}th{color:#9bb0c8}
+.actions{display:flex;gap:7px;flex-wrap:wrap}.pill{display:inline-block;padding:4px 9px;border-radius:20px;background:#263d56;font-size:12px}.warning{color:#fbbf24}.success{color:#34d399}
+#notice{padding:10px 14px;border-radius:10px;background:#193653;margin:12px 0;display:none}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+@media(max-width:600px){.wrap{padding:14px}.panel{padding:15px}.btn{padding:10px}}
+</style></head>
+<body><div class="wrap">
+<header class="top"><div><p class="muted">TRAVEL TOUCH / ADMIN</p><h1>لوحة إدارة المنصة</h1></div><div class="actions"><a class="btn secondary" href="/">الموقع</a><button class="btn secondary" id="logout">تسجيل الخروج</button></div></header>
+<div id="notice" role="status" aria-live="polite"></div>
+<section class="panel"><div class="top"><div><h2>إضافة عرض سفر</h2><p class="muted">أدخل بيانات العرض، وسيُسجل الإجراء في سجل التدقيق.</p></div></div>
+<form id="offer-form"><div class="grid">
+<label>اسم المزود<input name="provider" required maxlength="160"></label>
+<label>الغرفة / المقعد<input name="room" required maxlength="160"></label>
+<label>السعر الأصلي (USD)<input name="originalPrice" type="number" min="0.01" step="0.01" required></label>
+<label>السعر بعد الخصم (USD)<input name="discountedPrice" type="number" min="0.01" step="0.01" required></label>
+<label>نوع العرض<select name="type"><option value="hotel">فندق</option><option value="flight">طيران</option><option value="travel">سفر</option><option value="activity">نشاط</option></select></label>
+<label>الموقع<input name="location" maxlength="160"></label>
+<label>المنطقة<input name="region" maxlength="160" placeholder="مثل africa / asia"></label>
+<label>رابط الصورة<input name="image" type="url" maxlength="2000" placeholder="https://..."></label>
+<label>ينتهي العرض<input name="expiry" type="datetime-local" required></label>
+</div><p style="margin-top:14px"><button class="btn" type="submit">إضافة العرض</button></p></form></section>
+<section class="panel"><h2>العروض الحالية</h2><div class="table-wrap"><table><thead><tr><th>المزود</th><th>الغرفة / المقعد</th><th>السعر</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody id="offers"><tr><td colspan="5">جارٍ التحميل…</td></tr></tbody></table></div></section>
+<section class="panel"><div class="top"><div><h2>مراجعة المدفوعات</h2><p class="muted">الاسترداد الكامل ينفذ عبر PayPal بعد تأكيد المشرف.</p></div><button class="btn secondary" id="refresh">تحديث</button></div>
+<div class="table-wrap"><table><thead><tr><th>معرّف الدفع</th><th>العميل</th><th>المبلغ</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody id="payments"><tr><td colspan="5">جارٍ التحميل…</td></tr></tbody></table></div></section>
+<section class="panel"><h2>سجل التدقيق الإداري</h2><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الإجراء</th><th>المشرف</th><th>التفاصيل</th></tr></thead><tbody id="audit"><tr><td colspan="4">جارٍ التحميل…</td></tr></tbody></table></div></section>
+</div>
+<script type="module">
+import { TT } from "./tt-backend.js";
+const $=id=>document.getElementById(id), esc=TT.esc;
+let stopOffers,stopPayments,stopAudit;
+const notify=(msg,bad=false)=>TT.notify(msg,bad?"error":"success");
+const money=(n,c="USD")=>new Intl.NumberFormat("ar-EG",{style:"currency",currency:c}).format(Number(n||0));
+const date=v=>{const d=v?.toDate?.()|| (v?new Date(v):null);return d&&!Number.isNaN(d.getTime())?d.toLocaleString("ar-EG"):"—";};
+const run=async(fn)=>{try{return await fn()}catch(e){notify(e.message||"حدث خطأ غير متوقع.",true);throw e;}};
+try{
+ const session=await TT.whenReady();
+ if(!session.user){TT.requireLogin();throw new Error("login");}
+ if(!session.isAdmin){document.body.innerHTML='<main class="wrap"><h1>غير مصرح بالدخول</h1><p>هذه الصفحة للمشرفين فقط.</p><a href="/">العودة للموقع</a></main>';throw new Error("not-admin");}
+ const renderOffers=items=>{$("offers").innerHTML=items.length?items.map(o=>`<tr><td>${esc(o.provider||o.name||"—")}</td><td>${esc(o.room||"—")}</td><td>${money(o.discountedPrice)}</td><td><span class="pill">${esc(o.status||"—")}</span></td><td><div class="actions"><button class="btn secondary" data-edit="${esc(o.id)}">تعديل</button><button class="btn danger" data-delete="${esc(o.id)}">حذف</button></div></td></tr>`).join(""):'<tr><td colspan="5">لا توجد عروض.</td></tr>';};
+ const renderPayments=items=>{const needs=items.filter(p=>["review_required","refund_required","refund_pending","refund_failed"].includes(p.status));$("payments").innerHTML=needs.length?needs.map(p=>`<tr><td dir="ltr">${esc(p.id)}</td><td>${esc(p.userEmail||p.userId||"—")}</td><td>${money(Number(p.amountTotal||0)/100,p.currency||"USD")}</td><td><span class="pill warning">${esc(p.status)}</span></td><td>${p.paypalCaptureId?`<button class="btn danger" data-refund="${esc(p.id)}">رد المبلغ بالكامل</button>`:"يتطلب مراجعة يدوية لبيانات PayPal"}</td></tr>`).join(""):'<tr><td colspan="5">لا توجد مدفوعات تتطلب مراجعة.</td></tr>';};
+ const renderAudit=items=>{$("audit").innerHTML=items.length?items.map(a=>`<tr><td>${date(a.createdAt)}</td><td>${esc(a.action||"—")}</td><td dir="ltr">${esc(a.adminUid||a.actorUid||"—")}</td><td>${esc([a.offerId&&"عرض: "+a.offerId,a.paymentId&&"دفع: "+a.paymentId,a.status&&"الحالة: "+a.status,(a.changedFields||[]).join(", ")].filter(Boolean).join(" · ")||"—")}</td></tr>`).join(""):'<tr><td colspan="4">لا توجد سجلات بعد.</td></tr>';};
+ const start=()=>{stopOffers?.();stopPayments?.();stopAudit?.();stopOffers=TT.watchOffers(renderOffers,e=>notify(e.message,true));stopPayments=TT.watchAdminPayments(renderPayments,e=>notify(e.message,true));stopAudit=TT.watchAuditLogs(renderAudit,e=>notify(e.message,true));};
+ start();
+ let lastOfferSnapshot = null;
+ TT.appStore.subscribe(state => {
+   if (Array.isArray(state.offers) && state.offers !== lastOfferSnapshot) {
+     lastOfferSnapshot = state.offers;
+     renderOffers(state.offers);
+   }
+ });
+ $("offer-form").addEventListener("submit",async e=>{e.preventDefault();const f=new FormData(e.currentTarget),expiry=new Date(f.get("expiry"));const data={provider:f.get("provider"),name:f.get("provider"),room:f.get("room"),originalPrice:Number(f.get("originalPrice")),discountedPrice:Number(f.get("discountedPrice")),type:f.get("type"),location:f.get("location"),region:f.get("region"),image:f.get("image")};if(!(data.originalPrice>data.discountedPrice&&data.discountedPrice>0))return notify("يجب أن يكون السعر الأصلي أعلى من السعر المخفض.",true);if(!(expiry>Date.now()))return notify("اختر تاريخ انتهاء في المستقبل.",true);const btn=e.submitter;btn.disabled=true;try{await TT.createOffer(data,expiry);e.currentTarget.reset();notify("تمت إضافة العرض بنجاح.");}catch(err){notify(err.message,true);}finally{btn.disabled=false;}});
+ $("offers").addEventListener("click",async e=>{const edit=e.target.closest("[data-edit]")?.dataset.edit,del=e.target.closest("[data-delete]")?.dataset.delete;if(edit){const provider=await TT.prompt("اسم المزود الجديد:","",{title:"تعديل العرض"});if(provider===null)return;const discountedPrice=await TT.prompt("السعر المخفض الجديد (USD):","",{title:"السعر المخفض",inputType:"number"});if(discountedPrice===null)return;const originalPrice=await TT.prompt("السعر الأصلي الجديد (USD):","",{title:"السعر الأصلي",inputType:"number"});if(originalPrice===null)return;try{await TT.updateOffer(edit,{provider,discountedPrice:Number(discountedPrice),originalPrice:Number(originalPrice)});notify("تم تحديث العرض.");}catch(err){notify(err.message,true);}}if(del&&await TT.confirm("هل أنت متأكد من حذف العرض؟ لا يمكن التراجع عن هذا الإجراء.",{title:"حذف العرض",confirmLabel:"حذف نهائياً",danger:true})){try{await TT.deleteOffer(del);notify("تم حذف العرض.");}catch(err){notify(err.message,true);}}});
+ $("payments").addEventListener("click",async e=>{const id=e.target.closest("[data-refund]")?.dataset.refund;if(!id)return;if(!(await TT.confirm("سيتم طلب استرداد كامل المبلغ من PayPal. هل تريد المتابعة؟",{title:"تأكيد الاسترداد",confirmLabel:"طلب الاسترداد",danger:true})))return;const btn=e.target.closest("button");btn.disabled=true;try{const result=await TT.apiRequest("/api/admin-refund",{paymentId:id,reason:"admin_dashboard_review"});notify(result.status==="refunded"?"تم تأكيد الاسترداد من PayPal.":`حالة الاسترداد: ${result.status}`); }catch(err){notify(err.message,true);}finally{btn.disabled=false;}});
+ $("refresh").addEventListener("click",start);
+ $("logout").addEventListener("click",async()=>{await TT.signOut();location.href="/login.html";});
+}catch(e){if(!["login","not-admin"].includes(e.message))notify(e.message||"تعذر تهيئة لوحة الإدارة.",true);}
+window.addEventListener("beforeunload",()=>{stopOffers?.();stopPayments?.();stopAudit?.();});
+</script></body></html>

@@ -1,0 +1,133 @@
+openapi: 3.0.3
+info:
+  title: Travel Touch API
+  version: 1.2.2
+  description: API routes for authenticated Travel Touch clients. All user routes require a Firebase ID token in the Authorization Bearer header.
+servers:
+  - url: https://YOUR-PROJECT.vercel.app/api
+paths:
+  /health:
+    get:
+      summary: API health check
+      responses:
+        '200': { description: Service is responding }
+  /chat:
+    post:
+      summary: Ask the Travel Touch assistant
+      security: [{ FirebaseBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [message], properties: { message: { type: string, minLength: 1, maxLength: 1000 } } }
+      responses:
+        '200': { description: Assistant reply }
+        '401': { description: Authentication required }
+        '429': { description: Rate limit exceeded }
+  /chat-history:
+    get:
+      summary: Retrieve the authenticated user's recent assistant conversation
+      security: [{ FirebaseBearer: [] }]
+      responses:
+        '200': { description: Up to 40 recent messages }
+        '401': { description: Authentication required }
+  /admin-offer:
+    post:
+      summary: Update or delete an offer as an administrator
+      security: [{ FirebaseBearer: [] }]
+      responses:
+        '200': { description: Offer change saved and audit log created }
+        '403': { description: Administrator role required }
+  /ticket-qr:
+    post:
+      summary: Create a signed QR token for the authenticated user's confirmed booking
+      security: [{ FirebaseBearer: [] }]
+      responses:
+        '200': { description: Signed QR token }
+        '404': { description: Booking not found }
+  /checkin-ticket:
+    post:
+      summary: Verify a signed ticket token and mark its booking checked in
+      security: [{ FirebaseBearer: [] }]
+      responses:
+        '200': { description: Check-in recorded }
+        '403': { description: Administrator role required }
+        '409': { description: Ticket is not eligible or was already checked in }
+  /scan-passport:
+    post:
+      summary: Extract passenger name from a passport image
+      security: [{ FirebaseBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [imageBase64, legalConsent], properties: { imageBase64: { type: string }, legalConsent: { type: boolean, enum: [true] } } }
+      responses:
+        '200': { description: Extracted name }
+        '400': { description: Invalid image or missing consent }
+        '429': { description: Rate limit exceeded }
+  /hold-offer:
+    post:
+      summary: Acquire a short-lived private offer hold
+      security: [{ FirebaseBearer: [] }]
+      responses:
+        '200': { description: Hold expiry timestamp }
+        '409': { description: Offer expired or held by another user }
+  /release-hold:
+    post:
+      summary: Release the current user's hold unless PayPal payment is pending
+      security: [{ FirebaseBearer: [] }]
+      responses:
+        '200': { description: Release processed }
+  /create-order:
+    post:
+      summary: Create a PayPal order from a server-validated offer
+      security: [{ FirebaseBearer: [] }]
+      responses:
+        '200': { description: PayPal approval URL }
+        '409': { description: Offer is no longer available }
+  /capture-order:
+    post:
+      summary: Verify and capture a PayPal order
+      security: [{ FirebaseBearer: [] }]
+      responses:
+        '200': { description: Payment and booking status }
+        '409': { description: Payment requires review }
+  /paypal-webhook:
+    post:
+      summary: PayPal signed webhook receiver
+      responses:
+        '200': { description: Event accepted }
+        '401': { description: Invalid webhook signature }
+  /delete-account:
+    post:
+      summary: Delete the authenticated user's account after recent reauthentication
+      security: [{ FirebaseBearer: [] }]
+      responses:
+        '200': { description: Account deleted and financial records anonymized }
+        '401': { description: Recent authentication required }
+        '409': { description: Pending payment or refund prevents deletion }
+  /admin-refund:
+    post:
+      summary: Request an administrator-approved full PayPal refund
+      security: [{ FirebaseBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paymentId]
+              properties:
+                paymentId: { type: string, maxLength: 128 }
+                reason: { type: string, maxLength: 160 }
+      responses:
+        '200': { description: Refund completed or pending at PayPal }
+        '403': { description: Administrator role required }
+        '409': { description: Payment state does not permit a refund }
+components:
+  securitySchemes:
+    FirebaseBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase ID Token

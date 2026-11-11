@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#071426"><title>محفظة التذاكر | Travel Touch</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<style>body{background:#071426;color:#e5eefb;font-family:system-ui,sans-serif}.glass{background:#10243b;border:1px solid #25415f;border-radius:20px}.muted{color:#9bb0c8}</style>
+<link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/tt-design.css">
+</head>
+<body class="min-h-screen p-4 md:p-8">
+<header class="max-w-3xl mx-auto flex justify-between items-center mb-8"><a href="index.html" class="font-black text-xl">✈ Travel Touch</a><a href="profile.html" class="text-sky-300">حسابي</a></header>
+<main class="max-w-3xl mx-auto">
+<h1 class="text-3xl font-black mb-2">محفظة التذاكر</h1><p class="muted mb-6">تذاكرك المؤكدة المرتبطة بحسابك.</p>
+<div id="state" class="glass p-6">جارٍ تحميل التذاكر…</div><div id="tickets" class="space-y-4 mt-4"></div>
+</main>
+<script type="module">
+import { TT } from "./tt-backend.js";
+const $=id=>document.getElementById(id), esc=TT.esc;
+const money=n=>new Intl.NumberFormat("ar-EG",{style:"currency",currency:"USD"}).format(Number(n||0));
+function card(b){
+ const p=b.passenger||{}, price=b.price||{};
+ return `<article class="glass p-5">
+ <div class="flex justify-between gap-3 items-start"><div><p class="text-sky-300 text-sm">تذكرة Travel Touch</p><h2 class="text-xl font-bold mt-1">${esc(b.offerSnapshot?.provider||b.provider||"حجز مؤكد")}</h2></div><span class="text-xs rounded-full bg-emerald-900 text-emerald-200 px-3 py-1">${esc(b.status||"confirmed")}</span></div>
+ <div class="grid sm:grid-cols-2 gap-3 mt-5 text-sm"><p><span class="muted">اسم المسافر</span><br>${esc(p.firstName||"")} ${esc(p.lastName||"")}</p><p><span class="muted">رقم الحجز</span><br><b dir="ltr">${esc(b.id)}</b></p><p><span class="muted">المقعد / الغرفة</span><br>${esc(b.offerSnapshot?.room||b.room||"—")}</p><p><span class="muted">الإجمالي</span><br><b>${money(price.total)}</b></p></div>
+ <div class="mt-5 flex flex-wrap gap-2"><button data-qr="${esc(b.id)}" class="rounded-xl border border-slate-600 px-4 py-2">إظهار QR للتحقق</button><button onclick="window.print()" class="rounded-xl bg-sky-600 px-4 py-2 font-bold">طباعة التذكرة</button><button data-support="${esc(b.id)}" class="rounded-xl border border-slate-600 px-4 py-2">طلب مساعدة</button></div><div id="qr-${esc(b.id)}" class="hidden mt-4 p-4 bg-white rounded-xl w-fit"><div class="qr-canvas"></div><p class="text-xs text-slate-700 mt-2">اعرض الرمز لموظف Travel Touch المخوّل</p></div></article>`;
+}
+try{
+ const u=await TT.whenReady(); if(!u.user){TT.requireLogin();throw new Error("login");}
+ const id=new URLSearchParams(location.search).get("booking");
+ let bookings=id?[await TT.getBooking(id)]:await TT.listMyBookings();
+ $("state").textContent=bookings.length?"هذه حجوزاتك الحالية:":"لا توجد تذاكر مؤكدة في حسابك بعد.";
+ $("tickets").innerHTML=bookings.map(card).join("");
+ document.querySelectorAll("[data-support]").forEach(b=>b.addEventListener("click",async()=>{await TT.createSupportTicket({type:"booking",invoice:b.dataset.support,description:"أحتاج إلى مساعدة بخصوص هذا الحجز."});TT.notify("تم إرسال طلب الدعم.", "success");}));
+ document.querySelectorAll("[data-qr]").forEach(button=>button.addEventListener("click",async()=>{const box=$("qr-"+button.dataset.qr);box.classList.remove("hidden");const target=box.querySelector(".qr-canvas");if(target.dataset.ready)return;button.disabled=true;try{const token=await TT.getTicketQrToken(button.dataset.qr);if(!window.QRCode)throw new Error("مكتبة QR غير متاحة؛ تحقق من الاتصال ثم أعد المحاولة.");new QRCode(target,{text:token,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});target.dataset.ready="1";}catch(error){box.insertAdjacentText("beforeend",error.message||"تعذر إنشاء الرمز.");}finally{button.disabled=false;}}));
+}catch(e){if(e.message!=="login")$("state").textContent=e.message||"تعذر تحميل التذاكر.";}
+</script>
+<script>if("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("/sw.js").catch(()=>{});</script></body></html>
